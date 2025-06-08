@@ -1,5 +1,5 @@
 server:
-  port: 12000
+  port: 18000
 
 spring:
   application:
@@ -13,7 +13,8 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8080/realms/inkcloud
-          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
+          # jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
+          jwk-set-uri: http://localhost:8080/realms/inkcloud/protocol/openid-connect/certs
   datasource:   
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/review_db?serverTimezone=Asia/Seoul&characterEncoding=utf8
