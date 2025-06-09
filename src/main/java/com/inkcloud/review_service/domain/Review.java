@@ -34,7 +34,7 @@ public class Review {
     private String email; // 작성자 이메일
 
     @Column(name = "product_id", length = 50, nullable = false)
-    private String productId; // 책 ID
+    private Long productId; // 책 ID
 
     @Column(name = "product_name", length = 50, nullable = false)
     private String productName; // 책 이름

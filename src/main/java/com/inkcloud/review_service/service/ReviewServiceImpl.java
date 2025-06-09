@@ -2,8 +2,11 @@ package com.inkcloud.review_service.service;
 
 import com.inkcloud.review_service.domain.Review;
 import com.inkcloud.review_service.dto.ReviewDto;
+import com.inkcloud.review_service.dto.ReviewEventDto;
 import com.inkcloud.review_service.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -11,10 +14,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.beans.factory.annotation.Value;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -22,12 +31,24 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
 
+    private final KafkaTemplate<String, ReviewEventDto> kafkaTemplate;
+
+    @Value("${kafka.topic.review-rating-update:review-rating-update}")
+    private String reviewRatingUpdateTopic;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     //리뷰 작성 
     @Override
     public void createReview(ReviewDto reviewDto, String email) {
         reviewDto.setEmail(email); 
         Review review = dtoToEntity(reviewDto);
         reviewRepository.save(review);
+
+        // 카프카 메시지 전송
+        ReviewEventDto event = new ReviewEventDto("created", review.getProductId(), review.getRating());
+        log.info("카프카 메시지 전송 완료: {}", event);
+        sendRatingUpdateMessage(event);
     }
 
     // 책 ID로 리뷰 리스트 조회
@@ -145,4 +166,8 @@ public class ReviewServiceImpl implements ReviewService {
         return reviewPage.map(this::entityToDto);
     }
 
+    // 리뷰 작성/수정/삭제시, 카프카로 메시지 전송
+    private void sendRatingUpdateMessage(ReviewEventDto reviewEventDto) {
+        kafkaTemplate.send("review-rating-update", reviewEventDto);
+    }
 }

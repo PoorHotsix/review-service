@@ -55,15 +55,6 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
-    // 전체 리뷰 조회,검색-관리자
-    // @PreAuthorize("hasAuthority('ADMIN')")
-    // @GetMapping
-    // public ResponseEntity<Page<ReviewDto>> getAllReviews(@ModelAttribute ReviewRequestDto req) {
-    //     Page<ReviewDto> reviews = reviewService.getAllReviewsWithFilter(
-    //         req.getPage(), req.getSize(), req.getKeyword(), req.getStartDate(), req.getEndDate(), req.getMinRating(), req.getMaxRating()
-    //     );
-    //     return ResponseEntity.ok(reviews);
-    // }
 
     // 리뷰 수정 (comment, rating만, 둘 중 하나만 수정도 가능)
     @PatchMapping("/{reviewId}")

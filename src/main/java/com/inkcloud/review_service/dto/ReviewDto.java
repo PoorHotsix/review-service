@@ -19,7 +19,7 @@ public class ReviewDto {
 
     private String email;
 
-    private String productId;
+    private Long productId;
 
     private String productName;
 
