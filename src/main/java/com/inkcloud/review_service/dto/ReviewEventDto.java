@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 public class ReviewEventDto {
     private String type;      // "created", "updated", "deleted"
     private Long productId;
-    private int rating;
+    private Integer rating;
+    private Integer oldRating;
 }

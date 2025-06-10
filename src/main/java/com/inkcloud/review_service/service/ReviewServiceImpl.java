@@ -46,7 +46,7 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.save(review);
 
         // 카프카 메시지 전송
-        ReviewEventDto event = new ReviewEventDto("created", review.getProductId(), review.getRating());
+        ReviewEventDto event = new ReviewEventDto("created", review.getProductId(), review.getRating(), null);
         log.info("카프카 메시지 전송 완료: {}", event);
         sendRatingUpdateMessage(event);
     }
@@ -81,7 +81,6 @@ public class ReviewServiceImpl implements ReviewService {
     // 리뷰 수정 (내용, 별점만)
     @Override
     public void updateReview(Long reviewId, ReviewDto reviewDto, String email) {
-        
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
 
@@ -89,20 +88,25 @@ public class ReviewServiceImpl implements ReviewService {
             throw new IllegalArgumentException("본인 리뷰만 수정할 수 있습니다.");
         }
 
-        boolean changed = false;
+        // 코멘트만 변경된 경우
         if (reviewDto.getComment() != null) {
             review.setComment(reviewDto.getComment());
-            changed = true;
-        }
-        if (reviewDto.getRating() != null) {
-            review.setRating(reviewDto.getRating());
-            changed = true;
-        }
-        if (changed) {
-            // updatedAt 자동 갱신됨 (@PreUpdate)
             reviewRepository.save(review);
         }
+
+        // 평점이 변경된 경우
+        if (reviewDto.getRating() != null && !reviewDto.getRating().equals(review.getRating())) {
+            int oldRating = review.getRating();
+            review.setRating(reviewDto.getRating());
+            reviewRepository.save(review);
+
+            ReviewEventDto event = new ReviewEventDto("updated", review.getProductId(), reviewDto.getRating(), oldRating);
+            log.info("리뷰 수정 - 카프카 메시지 전송: {}", event);
+            sendRatingUpdateMessage(event);
+        }
     }
+
+
 
     // 리뷰 삭제 (여러 개 또는 하나 삭제 가능)
     @Override
@@ -118,6 +122,12 @@ public class ReviewServiceImpl implements ReviewService {
             if (!isOwner && !isAdmin) {
                 throw new IllegalArgumentException("본인 또는 관리자만 삭제할 수 있습니다.");
             }
+
+            //카프카 메세지 전송
+            ReviewEventDto event = new ReviewEventDto("deleted",review.getProductId(), null ,review.getRating()); // 삭제이므로 oldRating에 기존 평점 전달
+            log.info("리뷰 삭제 - 카프카 메시지 전송: {}", event);
+            sendRatingUpdateMessage(event);
+
             reviewRepository.delete(review);
         }
     }
