@@ -17,11 +17,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.security.access.AccessDeniedException;
 
 @Slf4j
 @Service
@@ -41,6 +41,10 @@ public class ReviewServiceImpl implements ReviewService {
     //리뷰 작성 
     @Override
     public void createReview(ReviewDto reviewDto, String email) {
+        boolean exists = reviewRepository.existsByProductIdAndEmail(reviewDto.getProductId(), email);
+        if (exists) {
+            throw new IllegalArgumentException("이미 해당 상품에 리뷰를 작성하셨습니다.");
+        }
         reviewDto.setEmail(email); 
         Review review = dtoToEntity(reviewDto);
         reviewRepository.save(review);
@@ -69,14 +73,26 @@ public class ReviewServiceImpl implements ReviewService {
                 .toList();
     }
 
-    // 전체 리뷰 조회-관리자
+    //리뷰 상세 조회
     @Override
-    public List<ReviewDto> getAllReviews() {
-        List<Review> reviews = reviewRepository.findAll();
-        return reviews.stream()
-                .map(this::entityToDto)
-                .toList();
+    public ReviewDto getReviewDetail(Long reviewId, String email) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
+        if (!review.getEmail().equals(email)) {
+            throw new AccessDeniedException("본인 리뷰만 조회할 수 있습니다.");
+        }
+        return entityToDto(review);
     }
+
+    
+    // 전체 리뷰 조회-관리자
+    // @Override
+    // public List<ReviewDto> getAllReviews() {
+    //     List<Review> reviews = reviewRepository.findAll();
+    //     return reviews.stream()
+    //             .map(this::entityToDto)
+    //             .toList();
+    // }
 
     // 리뷰 수정 (내용, 별점만)
     @Override

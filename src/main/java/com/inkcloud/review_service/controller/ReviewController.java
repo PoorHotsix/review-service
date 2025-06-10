@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.Collections;
@@ -29,8 +30,13 @@ public class ReviewController {
     public ResponseEntity<String> createReview(@RequestBody ReviewDto reviewDto,
                                                @AuthenticationPrincipal Jwt jwt) {
         String email = jwt.getClaimAsString("email");
-        reviewService.createReview(reviewDto, email);
-        return ResponseEntity.ok("리뷰가 성공적으로 등록되었습니다.");
+        try {
+            reviewService.createReview(reviewDto, email);
+            return ResponseEntity.ok("리뷰가 성공적으로 등록되었습니다.");
+        } catch (IllegalArgumentException e) {
+            // 한 회원이 같은 책에 대한 리뷰 작성시 409에러 반환
+            return ResponseEntity.status(409).body(e.getMessage());
+        }
     }
 
     // 책 ID로 리뷰 리스트, 평균 조회
@@ -55,6 +61,18 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
+    // 리뷰 상세 조회 (JWT 토큰에서 email 추출, 본인만 조회 가능)
+    @GetMapping("/detail/{reviewId}")
+    public ResponseEntity<ReviewDto> getReviewDetail(@PathVariable Long reviewId,
+                                                     @AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        try {
+            ReviewDto review = reviewService.getReviewDetail(reviewId, email);
+            return ResponseEntity.ok(review);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
 
     // 리뷰 수정 (comment, rating만, 둘 중 하나만 수정도 가능)
     @PatchMapping("/{reviewId}")

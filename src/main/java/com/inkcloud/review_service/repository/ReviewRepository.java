@@ -15,4 +15,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
 
     // 회원 이메일로 리뷰 조회
     List<Review> findAllByEmail(String email);
+
+    boolean existsByProductIdAndEmail(Long productId, String email);
 }

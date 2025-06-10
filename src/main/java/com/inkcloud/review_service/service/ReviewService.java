@@ -17,8 +17,13 @@ public interface ReviewService {
     // 회원 이메일로 리뷰 리스트 조회
     List<ReviewDto> getReviewsByEmail(String email);
 
-    // 전체 리뷰 조회-관리자
-    List<ReviewDto> getAllReviews();
+    //리뷰 상세 조회
+    ReviewDto getReviewDetail(Long reviewId, String email);
+
+    // 전체 리뷰 조회, 검색-관리자
+    Page<ReviewDto> getAllReviewsWithFilter(
+            int page, int size, String keyword, String startDate, String endDate, Integer minRating, Integer maxRating
+    );
 
     // 리뷰 수정 
     void updateReview(Long reviewId, ReviewDto reviewDto, String email);
@@ -56,7 +61,7 @@ public interface ReviewService {
                 .build();
     }
 
-    Page<ReviewDto> getAllReviewsWithFilter(
-            int page, int size, String keyword, String startDate, String endDate, Integer minRating, Integer maxRating
-    );
+
+
+
 }
