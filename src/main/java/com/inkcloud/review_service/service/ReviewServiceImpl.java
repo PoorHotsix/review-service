@@ -4,6 +4,8 @@ import com.inkcloud.review_service.domain.Review;
 import com.inkcloud.review_service.dto.ReviewDto;
 import com.inkcloud.review_service.dto.ReviewEventDto;
 import com.inkcloud.review_service.repository.ReviewRepository;
+import com.inkcloud.review_service.util.ReviewMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -13,14 +15,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.security.access.AccessDeniedException;
 
 @Slf4j
@@ -30,46 +34,64 @@ import org.springframework.security.access.AccessDeniedException;
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ReviewMapper reviewMapper;
 
     private final KafkaTemplate<String, ReviewEventDto> kafkaTemplate;
 
     @Value("${kafka.topic.review-rating-update:review-rating-update}")
     private String reviewRatingUpdateTopic;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // private final ObjectMapper objectMapper = new ObjectMapper();
 
     //리뷰 작성 
     @Override
-    public void createReview(ReviewDto reviewDto, String email) {
-        boolean exists = reviewRepository.existsByProductIdAndEmail(reviewDto.getProductId(), email);
-        if (exists) {
-            throw new IllegalArgumentException("이미 해당 상품에 리뷰를 작성하셨습니다.");
+    public boolean createReview(ReviewDto reviewDto, String email) {
+        Optional<Review> existing = reviewRepository.findByProductIdAndEmail(reviewDto.getProductId(), email);
+        if (existing.isPresent()) {
+            // 이미 작성한 리뷰가있으면 false 반환
+            reviewDto.setId(existing.get().getId());
+            return false;
         }
         reviewDto.setEmail(email); 
-        Review review = dtoToEntity(reviewDto);
+        Review review = reviewMapper.dtoToEntity(reviewDto);
         reviewRepository.save(review);
 
         // 카프카 메시지 전송
         ReviewEventDto event = new ReviewEventDto("created", review.getProductId(), review.getRating(), null);
         log.info("카프카 메시지 전송 완료: {}", event);
         sendRatingUpdateMessage(event);
+        return true;
     }
 
     // 책 ID로 리뷰 리스트 조회
     @Override
-    public List<ReviewDto> getReviewsByProductId(String productId) {
+    public List<ReviewDto> getReviewsByProductId(Long productId) {
         List<Review> reviews = reviewRepository.findAllByProductId(productId);
         return reviews.stream()
-                .map(this::entityToDto)
+                .map(reviewMapper::entityToDto)
                 .toList();
     }
 
     // 회원 이메일로 리뷰 리스트 조회
     @Override
-    public List<ReviewDto> getReviewsByEmail(String email) {
-        List<Review> reviews = reviewRepository.findAllByEmail(email);
+    public List<ReviewDto> getReviewsByEmail(String email, String period) {
+
+        LocalDate today = LocalDate.now();
+        LocalDate startDate;
+        switch (period) {
+            case "1d": startDate = today; break; // 오늘
+            case "1m": startDate = today.minusMonths(1); break; //1개월
+            case "3m": startDate = today.minusMonths(3); break; //3개월
+            case "6m": startDate = today.minusMonths(6); break; //6개월
+            case "5y": startDate = today.minusYears(5); break; //6개월
+            
+            default: startDate = today.minusYears(5); // 전체
+        }
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay().minusNanos(1); // 오늘 23:59:59.999999999
+        List<Review> reviews = reviewRepository.findByEmailAndCreatedAtBetween(email, start, end);
         return reviews.stream()
-                .map(this::entityToDto)
+                .map(reviewMapper::entityToDto)
                 .toList();
     }
 
@@ -81,7 +103,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (!review.getEmail().equals(email)) {
             throw new AccessDeniedException("본인 리뷰만 조회할 수 있습니다.");
         }
-        return entityToDto(review);
+        return reviewMapper.entityToDto(review);
     }
 
     
@@ -149,14 +171,14 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     //상품 리뷰 평균 조회
-    @Override
-    public double getAverageRatingByProductId(String productId) {
-        List<Review> reviews = reviewRepository.findAllByProductId(productId);
-        return reviews.stream()
-                .mapToInt(Review::getRating)
-                .average()
-                .orElse(0.0);
-    }
+    // @Override
+    // public double getAverageRatingByProductId(Long productId) {
+    //     List<Review> reviews = reviewRepository.findAllByProductId(productId);
+    //     return reviews.stream()
+    //             .mapToInt(Review::getRating)
+    //             .average()
+    //             .orElse(0.0);
+    // }
 
     // 전체 리뷰 조회 + 필터링 (관리자)
     @Override
@@ -164,32 +186,7 @@ public class ReviewServiceImpl implements ReviewService {
             int page, int size, String keyword, String startDate, String endDate, Integer minRating, Integer maxRating) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        // Specification 사용 (JPA Criteria)
-        Specification<Review> spec = Specification.where(null);
-
-        if (keyword != null && !keyword.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.or(
-                cb.like(root.get("productName"), "%" + keyword + "%"),
-                cb.like(root.get("comment"), "%" + keyword + "%")
-            ));
-        }
-        if (startDate != null && endDate != null) {
-            spec = spec.and((root, query, cb) -> cb.between(
-                root.get("createdAt"),
-                LocalDateTime.parse(startDate),
-                LocalDateTime.parse(endDate)
-            ));
-        }
-        if (minRating != null) {
-            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("rating"), minRating));
-        }
-        if (maxRating != null) {
-            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("rating"), maxRating));
-        }
-
-        Page<Review> reviewPage = reviewRepository.findAll(spec, pageable);
-        return reviewPage.map(this::entityToDto);
+        return reviewRepository.searchReviews(keyword, startDate, endDate, minRating, maxRating, pageable);
     }
 
     // 리뷰 작성/수정/삭제시, 카프카로 메시지 전송

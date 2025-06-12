@@ -11,7 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ReviewRequestDto {
     private int page = 0;
-    private int size = 10;
+    private int size = 20;
     private String keyword;
     private String startDate;
     private String endDate;

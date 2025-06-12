@@ -4,6 +4,7 @@ import com.inkcloud.review_service.dto.ReviewDto;
 import com.inkcloud.review_service.dto.ReviewRequestDto;
 import com.inkcloud.review_service.service.ReviewService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/reviews")
 @RequiredArgsConstructor
@@ -27,37 +29,42 @@ public class ReviewController {
 
     // 리뷰 작성 (JWT 토큰에서 email 추출)
     @PostMapping
-    public ResponseEntity<String> createReview(@RequestBody ReviewDto reviewDto,
+    public ResponseEntity<Map<String, Object>> createReview(@RequestBody ReviewDto reviewDto,
                                                @AuthenticationPrincipal Jwt jwt) {
         String email = jwt.getClaimAsString("email");
-        try {
-            reviewService.createReview(reviewDto, email);
-            return ResponseEntity.ok("리뷰가 성공적으로 등록되었습니다.");
-        } catch (IllegalArgumentException e) {
-            // 한 회원이 같은 책에 대한 리뷰 작성시 409에러 반환
-            return ResponseEntity.status(409).body(e.getMessage());
+        boolean created = reviewService.createReview(reviewDto, email);
+        Map<String, Object> result = new HashMap<>();
+        if (created) {
+            result.put("message", "리뷰가 성공적으로 등록되었습니다.");
+            result.put("reviewId", reviewDto.getId());
+            return ResponseEntity.ok(result);
+        } else {
+            result.put("message", "이미 해당 상품에 리뷰를 작성하셨습니다.");
+            result.put("reviewId", reviewDto.getId());
+            return ResponseEntity.status(409).body(result);
         }
     }
 
     // 책 ID로 리뷰 리스트, 평균 조회
     @GetMapping("/products/{productId}")
-    public ResponseEntity<Map<String, Object>> getReviewsByProductId(@PathVariable String productId) {
+    public ResponseEntity<List<ReviewDto>> getReviewsByProductId(@PathVariable Long productId) {
 
         List<ReviewDto> reviews = reviewService.getReviewsByProductId(productId);
-        double avgRating = reviewService.getAverageRatingByProductId(productId);
+        // double avgRating = reviewService.getAverageRatingByProductId(productId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("reviews", reviews);
-        result.put("averageRating", avgRating);
+        // result.put("averageRating", avgRating);
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(reviews);
     }
 
-    // 회원 이메일로 리뷰 리스트 조회 (JWT 토큰에서 email 추출)
+    // 회원 이메일로 리뷰 리스트 조회 (JWT 토큰에서 email 추출) period 종류:  1d,1m,3m,6m 
     @GetMapping("/members/me")
-    public ResponseEntity<List<ReviewDto>> getReviewsByEmail(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<List<ReviewDto>> getReviewsByEmail(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String period) {
+        log.info("period: {}", period);
         String email = jwt.getClaimAsString("email");
-        List<ReviewDto> reviews = reviewService.getReviewsByEmail(email);
+        List<ReviewDto> reviews = reviewService.getReviewsByEmail(email, period);
         return ResponseEntity.ok(reviews);
     }
 
@@ -101,9 +108,14 @@ public class ReviewController {
     @PreAuthorize("hasAuthority('ADMIN')")
     @PostMapping("/admin")
     public ResponseEntity<Page<ReviewDto>> searchAllReviews(@RequestBody ReviewRequestDto req) {
+        
+          log.info("searchAllReviews 요청: page={}, size={}, keyword={}, startDate={}, endDate={}, minRating={}, maxRating={}",
+            req.getPage(), req.getSize(), req.getKeyword(), req.getStartDate(), req.getEndDate(), req.getMinRating(), req.getMaxRating());
+
         Page<ReviewDto> reviews = reviewService.getAllReviewsWithFilter(
             req.getPage(), req.getSize(), req.getKeyword(), req.getStartDate(), req.getEndDate(), req.getMinRating(), req.getMaxRating()
         );
+        log.info("reviews: {}", reviews);
         return ResponseEntity.ok(reviews);
     }
 }
