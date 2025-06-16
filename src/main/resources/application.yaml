@@ -1,25 +1,24 @@
 server:
-  port: 18000
+  port: ${SPRING_REVIEW_SERVER_PORT}
 
 spring:
   application:
     name: review-service
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE}
   # MySQL-Server & JPA 설정
   # Quarkus 기반 Keycloak-Server 을 이용한 인증 처리
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://keycloak:8080/realms/inkcloud
-          # jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
-          jwk-set-uri: http://keycloak:8080/realms/inkcloud/protocol/openid-connect/certs
+          issuer-uri: ${SPRING_KEYCLOAK_URL}/realms/inkcloud
+          jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
   datasource:   
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://db:3306/review_db?serverTimezone=Asia/Seoul&characterEncoding=utf8
-    username: root
-    password: 1234  
+    url: ${SPRING_REVIEW_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_USERNAME} 
     hikari:
       connection-timeout: 20000
       maximum-pool-size: 10
@@ -31,7 +30,7 @@ spring:
       hibernate:  
         "[format_sql]": true
   kafka:
-    bootstrap-servers: broker:9092
+    bootstrap-servers: ${SPRING_KAFKA}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
