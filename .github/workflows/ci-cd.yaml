@@ -1,0 +1,120 @@
+# GitHub Actions 에서 수행할 워크플로우 이름
+name: Build, Push, and Update Deployment 
+    
+# 워크플로우를 트리거하는 이벤트 정의
+# 이 워크플로우는 main 브랜치에 대한 푸시 이벤트 또는 main 브랜치로의 풀 리퀘스트 이벤트가 발생할 때마다 트리거된다.
+on:  
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      
+env:
+  GITOPS_PATH: dev/review-service
+  
+
+jobs:      # 여러개의 작업을 정의할 수 있다.
+  build:   # build 작업 정의
+    runs-on: ubuntu-22.04             # GitHub Actions 워크플로우가 실행 될 가상 환경(Runner)에서 사용할 운영체제
+    steps:                            # GitHub Actions 워크플로우에서 하나의 job(작업) 내에서 실행될 개별적인 작업 단위
+      - name: Checkout repository     # 1단게 : 명령어를 실행하거나 (run), GitHub에서 제공하는 액션(action)을 사용 실행
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17           # 2단계
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+          
+      - name: Grant execute permission for Gradle Wrapper
+        run: |
+          chmod +x gradlew
+          git add gradlew
+          git diff --quiet gradlew || (git commit -m "Fix gradlew file permissions" && git push https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git HEAD:$(echo ${{ github.ref }} | sed 's/refs\/heads\///'))
+
+      - name: Cache Gradle packages  #  Gradle 캐싱 설정 : Gradle 빌드 속도 최적화
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Gradle Wrapper를 사용하여 프로젝트를 빌드. 테스트는 건너 뛰고 빌드만 진행.
+      - name: Build with Gradle Wrapper
+        run: ./gradlew build -x test
+         
+      # AWS 자격 증명 설정
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      
+      # Amazon ECR(Elastic Container Registry) 로그인
+      # aws ecr get-login-password 명령어를 사용하여 Docker 클라이언트를 인증하며, Docker가 ECR과 통신할 수 있게 해줍니다.
+      # ECR_REGISTRY : Amazon ECR 레지스트리 URI
+      # uses: aws-actions/amazon-ecr-login@v1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}  
+      
+
+      # Docker 이미지를 빌드하고 ECR에 푸시합니다.
+      # ECR_REGISTRY: Amazon ECR 레지스트리 URI
+      # ECR_REPOSITORY: ECR 내 리포지토리 이름
+      # IMAGE_TAG: GitHub 커밋 SHA를 이미지 태그로 사용하여 이미지의 버전을 관리합니다. 각 커밋마다 고유한 태그가 붙어 관리가 용이
+      # 이미지가 빌드되고, 지정된 ECR 리포지토리에 푸시됩니다
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: review-service                          
+          IMAGE_TAG: ${{ github.sha }}                               
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # ---------------------------------------------------------------------------------------------------------------------
+      #  Kubernetes 관련 설정     
+      # ---------------------------------------------------------------------------------------------------------------------
+      # 외부 GitOps 저장소를 워크플로우 내에 체크아웃(복제) 한다.
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ secrets.GITOPS_REPO }}   # 외부 Git 저장소의 이름 (<소유자>/<저장소명>) : kimsinok0714/gitops-repo
+          token: ${{ secrets.PAT }}                # 인증에 사용할 GitHub 토큰.  푸시 권한도 포함되어 있습니다. 
+          path: gitops-repo                        # 저장소를 체크아웃할 로컬 경로, gitops-repo/ 라는 하위 폴더에 복제한다.
+
+      #  yq 유틸리티 : GitHub Actions 내에서 values.yaml 등의 YAML 파일을 자동으로 수정하기 위해 사용
+                # IMAGE_TAG="${{ secrets.ECR_REGISTRY }}/$ECR_REPOSITORY:${{ github.sha }}"
+      - name: Install yq for YAML editing
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Update image tag in values.yaml
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: member-service  
+        run: |
+          cd gitops-repo/$GITOPS_PATH   #  GitHub Actions 워크플로우에서 GitOps 저장소 내의 특정 마이크로서비스 디렉토리 경로,   member-service
+          IMAGE_TAG="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" 
+          yq -i ".app.image = \"${IMAGE_TAG}\"" values.yaml
+          
+      - name: Commit and push changes to GitOps repo
+        run: |
+          cd gitops-repo
+          git config user.name "github-actions"   # Git 사용자 이름(user.name)과 이메일(user.email)은 원하시는 어떤 값으로든 설정
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Update image tag to $IMAGE_TAG"
+          git push origin main
+      
