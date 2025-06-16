@@ -69,6 +69,7 @@ public class ReviewReportController {
             Pageable pageable
     ) {
         Page<ReviewReportDto> result = reviewReportService.searchReports(type, from, to, keyword, pageable);
+        log.info("result: {}", result);
         return ResponseEntity.ok(result);
     }
 

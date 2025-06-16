@@ -6,6 +6,8 @@ import com.inkcloud.review_service.domain.ReviewReport;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.support.PageableExecutionUtils;
@@ -13,6 +15,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 public class ReviewReportRepositoryImpl implements ReviewReportRepositoryCustom {
 
@@ -51,6 +54,7 @@ public class ReviewReportRepositoryImpl implements ReviewReportRepositoryCustom 
                 .limit(pageable.getPageSize())
                 .fetch();
 
+        log.info("content: {}", content);
         long total = queryFactory
                 .select(report.count())
                 .from(report)

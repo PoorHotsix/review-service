@@ -10,6 +10,7 @@ import com.inkcloud.review_service.repository.ReviewRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@ToString
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -61,8 +63,11 @@ public class ReviewReportServiceImpl implements ReviewReportService {
     //관리자 리뷰리포트 조회
     @Override
     public Page<ReviewReportDto> searchReports(ReportType type, LocalDateTime from, LocalDateTime to, String keyword, Pageable pageable) {
-        return reviewReportRepository.searchReports(type, from, to, keyword, pageable)
-            .map(this::entityToDto);
+        Page<ReviewReport> reports = reviewReportRepository.searchReports(type, from, to, keyword, pageable);
+        log.info("관리자 리뷰리포트 조회 결과(엔티티): {}", reports.getContent());
+        Page<ReviewReportDto> dtoPage = reports.map(this::entityToDto);
+        log.info("관리자 리뷰리포트 조회 결과(DTO): {}", dtoPage.getContent());
+        return dtoPage;
     }
 
     private ReviewReportDto entityToDto(ReviewReport entity) {
