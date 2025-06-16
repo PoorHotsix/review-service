@@ -1,6 +1,7 @@
 package com.inkcloud.review_service.controller;
 
 import com.inkcloud.review_service.dto.ReviewDto;
+import com.inkcloud.review_service.dto.ReviewLikeDto;
 import com.inkcloud.review_service.dto.ReviewRequestDto;
 import com.inkcloud.review_service.service.ReviewService;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,16 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
+    // 책 id, email로 리뷰 리스트 조회(좋아요 여부 포함)
+    @GetMapping("/likes")
+    public ResponseEntity<List<ReviewDto>> getReviewsByProductIdWithMyLike(
+            @RequestParam Long productId,
+            @AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        List<ReviewDto> reviews = reviewService.getReviewsWithLikes(productId, email);
+        return ResponseEntity.ok(reviews);
+    }
+
     // 회원 이메일로 리뷰 리스트 조회 (JWT 토큰에서 email 추출) period 종류:  1d,1m,3m,6m 
     @GetMapping("/members/me")
     public ResponseEntity<List<ReviewDto>> getReviewsByEmail(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String period) {
@@ -80,6 +91,20 @@ public class ReviewController {
             return ResponseEntity.status(403).build();
         }
     }
+
+    //관리자 리뷰상세 조회 
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @GetMapping("/admin/detail/{reviewId}")
+    public ResponseEntity<ReviewDto> getReviewDetailByAdmin(@PathVariable Long reviewId) {
+        try {
+            ReviewDto review = reviewService.getReviewDetail(reviewId, null); // email null로 전달
+            return ResponseEntity.ok(review);
+        } catch (Exception e) {
+            return ResponseEntity.status(404).build();
+        }
+    }
+
+
 
     // 리뷰 수정 (comment, rating만, 둘 중 하나만 수정도 가능)
     @PatchMapping("/{reviewId}")
@@ -117,5 +142,38 @@ public class ReviewController {
         );
         log.info("reviews: {}", reviews);
         return ResponseEntity.ok(reviews);
+    }
+
+
+    // 리뷰 좋아요
+    @PostMapping("/like")
+    public ResponseEntity<Long> likeReview(@RequestParam Long reviewId,
+                                                     @AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        reviewService.likesReview(reviewId, email); 
+
+        return ResponseEntity.ok(reviewId);
+    }
+
+    // 리뷰 좋아요 취소
+    @DeleteMapping("/like")
+    public ResponseEntity<?> cancelLikes(@RequestParam Long reviewId,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        try {
+            reviewService.cancelLikesReview(reviewId, email);
+            return ResponseEntity.ok(reviewId);
+        } catch (IllegalStateException e) {
+            // 이미 좋아요를 누르지 않은 경우 등
+            Map<String, Object> result = new HashMap<>();
+            result.put("message", e.getMessage());
+            result.put("reviewId", reviewId);
+            return ResponseEntity.status(409).body(result); // 409 Conflict
+        } catch (Exception e) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("message", e.getMessage());
+            result.put("reviewId", reviewId);
+            return ResponseEntity.status(500).body(result);
+        }
     }
 }

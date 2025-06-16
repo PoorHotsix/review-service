@@ -1,6 +1,8 @@
 package com.inkcloud.review_service.service;
 
 import com.inkcloud.review_service.dto.ReviewDto;
+import com.inkcloud.review_service.dto.ReviewLikeDto;
+
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -12,6 +14,9 @@ public interface ReviewService {
 
     // 책 ID로 리뷰 리스트 조회
     List<ReviewDto> getReviewsByProductId(Long productId);
+
+    //책 ID + 회원 이메리일로 뷰 리스트(좋아요 여부 포함) 조회
+    List<ReviewDto> getReviewsWithLikes(Long productId, String email);
 
     // 회원 이메일로 리뷰 리스트 조회
     List<ReviewDto> getReviewsByEmail(String email, String period);
@@ -29,6 +34,13 @@ public interface ReviewService {
 
     // 리뷰 삭제
     void deleteReviews(List<Long> reviewIds, String email, List<String> roles);
+
+    //리뷰 좋아요 
+    void likesReview(Long reviewId, String email);
+
+    //리뷰 좋아요 취소 
+    void cancelLikesReview(Long reviewId, String email);
+
 
     // 상품 ID로 평균 평점 조회
     // double getAverageRatingByProductId(String productId);

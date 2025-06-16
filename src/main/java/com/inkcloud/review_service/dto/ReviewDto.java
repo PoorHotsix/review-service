@@ -27,8 +27,12 @@ public class ReviewDto {
 
     private String comment;
 
+    private int likeCount;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    private boolean likedByMe;
     
 }

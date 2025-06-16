@@ -12,12 +12,12 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8080/realms/inkcloud
+          issuer-uri: http://keycloak:8080/realms/inkcloud
           # jwk-set-uri: ${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs
-          jwk-set-uri: http://localhost:8080/realms/inkcloud/protocol/openid-connect/certs
+          jwk-set-uri: http://keycloak:8080/realms/inkcloud/protocol/openid-connect/certs
   datasource:   
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/review_db?serverTimezone=Asia/Seoul&characterEncoding=utf8
+    url: jdbc:mysql://db:3306/review_db?serverTimezone=Asia/Seoul&characterEncoding=utf8
     username: root
     password: 1234  
     hikari:
@@ -31,7 +31,7 @@ spring:
       hibernate:  
         "[format_sql]": true
   kafka:
-    bootstrap-servers: localhost:9093
+    bootstrap-servers: broker:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -60,4 +60,4 @@ eureka:
     register-with-eureka: true  
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: http://eureka-server:8761/eureka

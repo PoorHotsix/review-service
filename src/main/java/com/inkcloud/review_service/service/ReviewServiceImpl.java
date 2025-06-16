@@ -1,8 +1,11 @@
 package com.inkcloud.review_service.service;
 
 import com.inkcloud.review_service.domain.Review;
+import com.inkcloud.review_service.domain.ReviewLike;
 import com.inkcloud.review_service.dto.ReviewDto;
 import com.inkcloud.review_service.dto.ReviewEventDto;
+import com.inkcloud.review_service.dto.ReviewLikeDto;
+import com.inkcloud.review_service.repository.ReviewLikeRepository;
 import com.inkcloud.review_service.repository.ReviewRepository;
 import com.inkcloud.review_service.util.ReviewMapper;
 
@@ -18,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.springframework.security.access.AccessDeniedException;
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ReviewLikeRepository reviewLikeRepository;
     private final ReviewMapper reviewMapper;
 
     private final KafkaTemplate<String, ReviewEventDto> kafkaTemplate;
@@ -72,6 +74,29 @@ public class ReviewServiceImpl implements ReviewService {
                 .toList();
     }
 
+
+
+    //책 ID + 회원 이메일로 리뷰 리스트(좋아요 여부 포함) 조회
+    @Override
+    public List<ReviewDto> getReviewsWithLikes(Long productId, String email) {
+        // 1. 해당 책의 모든 리뷰 조회
+        List<Review> reviews = reviewRepository.findAllByProductId(productId);
+
+        // 2. 사용자가 좋아요한 리뷰 ID 목록 조회
+        List<Long> likedReviewIds = reviewLikeRepository.findAllByEmail(email).stream()
+                .map(like -> like.getReview().getId())
+                .toList();
+
+        // 3. 각 리뷰를 ReviewDto로 변환하면서 likedByMe 필드 세팅
+        return reviews.stream()
+                .map(review -> {
+                    ReviewDto dto = reviewMapper.entityToDto(review);
+                    dto.setLikedByMe(likedReviewIds.contains(review.getId()));
+                    return dto;
+                })
+                .toList();
+    }
+
     // 회원 이메일로 리뷰 리스트 조회
     @Override
     public List<ReviewDto> getReviewsByEmail(String email, String period) {
@@ -100,21 +125,15 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewDto getReviewDetail(Long reviewId, String email) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
-        if (!review.getEmail().equals(email)) {
-            throw new AccessDeniedException("본인 리뷰만 조회할 수 있습니다.");
+
+        // email이 null 또는 빈 값이면(관리자) 본인 체크 생략
+        if (email != null && !email.isBlank()) {
+            if (!review.getEmail().equals(email)) {
+                throw new AccessDeniedException("본인 리뷰만 조회할 수 있습니다.");
+            }
         }
         return reviewMapper.entityToDto(review);
     }
-
-    
-    // 전체 리뷰 조회-관리자
-    // @Override
-    // public List<ReviewDto> getAllReviews() {
-    //     List<Review> reviews = reviewRepository.findAll();
-    //     return reviews.stream()
-    //             .map(this::entityToDto)
-    //             .toList();
-    // }
 
     // 리뷰 수정 (내용, 별점만)
     @Override
@@ -170,16 +189,6 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
-    //상품 리뷰 평균 조회
-    // @Override
-    // public double getAverageRatingByProductId(Long productId) {
-    //     List<Review> reviews = reviewRepository.findAllByProductId(productId);
-    //     return reviews.stream()
-    //             .mapToInt(Review::getRating)
-    //             .average()
-    //             .orElse(0.0);
-    // }
-
     // 전체 리뷰 조회 + 필터링 (관리자)
     @Override
     public Page<ReviewDto> getAllReviewsWithFilter(
@@ -192,5 +201,50 @@ public class ReviewServiceImpl implements ReviewService {
     // 리뷰 작성/수정/삭제시, 카프카로 메시지 전송
     private void sendRatingUpdateMessage(ReviewEventDto reviewEventDto) {
         kafkaTemplate.send("review-rating-update", reviewEventDto);
+    }
+
+    //리뷰 좋아요
+    @Override
+    public void likesReview(Long reviewId, String email) {
+
+    Review review = reviewRepository.findById(reviewId)
+        .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
+
+    // 이미 좋아요를 눌렀는지 확인
+    boolean alreadyLiked = reviewLikeRepository.existsByReviewIdAndEmail(reviewId, email);
+    if (alreadyLiked) {
+        throw new IllegalStateException("이미 좋아요를 누른 리뷰입니다.");
+    }
+
+    // 좋아요 추가
+    ReviewLike reviewLike = ReviewLike.builder()
+        .review(review)
+        .email(email)
+        .createdAt(LocalDateTime.now())
+        .build();
+
+    reviewLikeRepository.save(reviewLike);
+
+    // likeCount 증가
+    review.setLikeCount(review.getLikeCount() + 1);
+    reviewRepository.save(review);
+    }
+
+    //리뷰 좋아요 취소 
+    @Override
+    public void cancelLikesReview(Long reviewId, String email) {
+
+    Review review = reviewRepository.findById(reviewId)
+        .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다."));
+
+    // 좋아요 엔티티 찾기
+    ReviewLike reviewLike = reviewLikeRepository.findByReviewAndEmail(review, email)
+        .orElseThrow(() -> new IllegalStateException("좋아요를 누른 적이 없습니다."));
+
+    reviewLikeRepository.delete(reviewLike);
+
+    // likeCount 감소 (0 이하로 내려가지 않게)
+    review.setLikeCount(Math.max(0, review.getLikeCount() - 1));
+    reviewRepository.save(review);
     }
 }

@@ -14,6 +14,7 @@ public class ReviewMapper {
                 .productName(review.getProductName())
                 .rating(review.getRating())
                 .comment(review.getComment())
+                .likeCount(review.getLikeCount())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
                 .build();
@@ -26,6 +27,7 @@ public class ReviewMapper {
                 .productName(dto.getProductName())
                 .rating(dto.getRating())
                 .comment(dto.getComment())
+                .likeCount(dto.getLikeCount())
                 .createdAt(dto.getCreatedAt())
                 .updatedAt(dto.getUpdatedAt())
                 .build();
