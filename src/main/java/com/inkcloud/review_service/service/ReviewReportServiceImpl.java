@@ -64,9 +64,19 @@ public class ReviewReportServiceImpl implements ReviewReportService {
     @Override
     public Page<ReviewReportDto> searchReports(ReportType type, LocalDateTime from, LocalDateTime to, String keyword, Pageable pageable) {
         Page<ReviewReport> reports = reviewReportRepository.searchReports(type, from, to, keyword, pageable);
-        log.info("관리자 리뷰리포트 조회 결과(엔티티): {}", reports.getContent());
+
         Page<ReviewReportDto> dtoPage = reports.map(this::entityToDto);
-        log.info("관리자 리뷰리포트 조회 결과(DTO): {}", dtoPage.getContent());
+
+        // 엔티티의 reportedAt 로그로 출력
+        for (ReviewReport report : reports.getContent()) {
+            log.info("리뷰리포트 reportedAt: {}", report.getReportedAt());
+        }
+
+        // DTO의 reportedAt 로그로 출력
+        for (ReviewReportDto dto : dtoPage.getContent()) {
+            log.info("리뷰리포트 DTO reportedAt: {}", dto.getReportedAt());
+        }
+
         return dtoPage;
     }
 

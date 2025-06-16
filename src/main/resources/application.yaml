@@ -1,5 +1,7 @@
 server:
   port: ${SPRING_REVIEW_SERVER_PORT}
+  jackson:
+    timezone: Asia/Seoul
 
 spring:
   application:
@@ -18,7 +20,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${SPRING_REVIEW_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_USERNAME} 
+    password: ${SPRING_DATASOURCE_PASSWORD} 
     hikari:
       connection-timeout: 20000
       maximum-pool-size: 10

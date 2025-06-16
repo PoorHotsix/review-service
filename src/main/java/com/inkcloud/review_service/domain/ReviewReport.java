@@ -32,7 +32,11 @@ public class ReviewReport {
     private String reason; // 신고 사유
 
     @Column(nullable = false)
-    private LocalDateTime reportedAt = LocalDateTime.now();
+    private LocalDateTime reportedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        this.reportedAt = LocalDateTime.now();
+    }
 
 }
