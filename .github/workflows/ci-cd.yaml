@@ -1,6 +1,6 @@
 # GitHub Actions 에서 수행할 워크플로우 이름
 name: Build, Push, and Update Deployment 
-    
+     
 # 워크플로우를 트리거하는 이벤트 정의
 # 이 워크플로우는 main 브랜치에 대한 푸시 이벤트 또는 main 브랜치로의 풀 리퀘스트 이벤트가 발생할 때마다 트리거된다.
 on:  
