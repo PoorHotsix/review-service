@@ -103,7 +103,7 @@ jobs:      # 여러개의 작업을 정의할 수 있다.
       - name: Update image tag in values.yaml
         env:
           ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: member-service  
+          ECR_REPOSITORY: review-service  
         run: |
           cd gitops-repo/$GITOPS_PATH   #  GitHub Actions 워크플로우에서 GitOps 저장소 내의 특정 마이크로서비스 디렉토리 경로,   member-service
           IMAGE_TAG="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" 
