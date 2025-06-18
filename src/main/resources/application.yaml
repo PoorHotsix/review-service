@@ -53,12 +53,12 @@ logging:
     com.mzc.review_service: INFO
 
 # Eureka-Server 에 자가 등록 설정
-eureka:
-  instance:
-    instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
-    prefer-ip-address: true
-  client:  
-    register-with-eureka: true  
-    fetch-registry: true
-    service-url:
-      defaultZone: http://eureka-server:8761/eureka
+# eureka:
+#   instance:
+#     instance-id: ${spring.application.name}:${spring.cloud.client.hostname}:${server.port}
+#     prefer-ip-address: true
+#   client:  
+#     register-with-eureka: true  
+#     fetch-registry: true
+#     service-url:
+#       defaultZone: http://eureka-server:8761/eureka
