@@ -33,13 +33,11 @@ spring:
         "[format_sql]": true
   kafka:
     bootstrap-servers: ${SPRING_KAFKA}
+    consumer:
+      auto-offset-reset: earliest
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    consumer:
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.inkcloud.review_service.dto,com.inkcloud.product_service.dto"
 
 
 
