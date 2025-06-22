@@ -13,7 +13,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
@@ -90,5 +89,13 @@ public class ReviewReportController {
             log.error("신고 삭제 처리 중 예외 발생", e);
             return ResponseEntity.status(500).body("신고 삭제 처리 오류 발생");
         }
+    }
+
+    // 관리자: 특정 리뷰의 신고 리스트 조회
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @GetMapping("/reports/{reviewId}")
+    public ResponseEntity<List<ReviewReportDto>> getReportsByReviewId(@PathVariable Long reviewId) {
+        List<ReviewReportDto> reports = reviewReportService.getReportsByReviewId(reviewId);
+        return ResponseEntity.ok(reports);
     }
 }

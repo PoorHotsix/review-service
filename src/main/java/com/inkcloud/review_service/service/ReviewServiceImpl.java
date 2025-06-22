@@ -4,7 +4,6 @@ import com.inkcloud.review_service.domain.Review;
 import com.inkcloud.review_service.domain.ReviewLike;
 import com.inkcloud.review_service.dto.ReviewDto;
 import com.inkcloud.review_service.dto.ReviewEventDto;
-import com.inkcloud.review_service.dto.ReviewLikeDto;
 import com.inkcloud.review_service.repository.ReviewLikeRepository;
 import com.inkcloud.review_service.repository.ReviewRepository;
 import com.inkcloud.review_service.util.ReviewMapper;

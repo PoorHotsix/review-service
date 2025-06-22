@@ -80,10 +80,23 @@ public class ReviewReportServiceImpl implements ReviewReportService {
         return dtoPage;
     }
 
-    private ReviewReportDto entityToDto(ReviewReport entity) {
+    // DTO에 productId, productName 추가 (Review 엔티티에서 바로 조회)
+    public ReviewReportDto entityToDto(ReviewReport entity) {
+        Review review = reviewRepository.findById(entity.getReview().getId())
+            .orElse(null);
+
+        Long productId = null;
+        String productName = null;
+        if (review != null) {
+            productId = review.getProductId();
+            productName = review.getProductName();
+        }
+
         return ReviewReportDto.builder()
                 .id(entity.getId())
                 .reviewId(entity.getReview().getId())
+                .productId(productId)
+                .productName(productName)
                 .reporterEmail(entity.getReporterEmail())
                 .type(entity.getType()) 
                 .reason(entity.getReason())
@@ -101,5 +114,13 @@ public class ReviewReportServiceImpl implements ReviewReportService {
             reviewReportRepository.delete(report);
             log.info("리뷰 신고 삭제 완료: reportId={}", reportId);
         }
+    }
+
+    @Override
+    public List<ReviewReportDto> getReportsByReviewId(Long reviewId) {
+        List<ReviewReport> reports = reviewReportRepository.findAllByReviewId(reviewId);
+        return reports.stream()
+                .map(this::entityToDto)
+                .toList();
     }
 }

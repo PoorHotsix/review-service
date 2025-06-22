@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -35,4 +36,5 @@ public class ReviewDto {
 
     private boolean likedByMe;
     
+    List<ReviewReportDto> reports;
 }

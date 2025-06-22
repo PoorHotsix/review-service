@@ -18,6 +18,8 @@ import lombok.Setter;
 public class ReviewReportDto {
     private Long id;
     private Long reviewId;
+    private Long productId;
+    private String productName;
     private String reporterEmail;
     private ReportType type; 
     private String reason;
