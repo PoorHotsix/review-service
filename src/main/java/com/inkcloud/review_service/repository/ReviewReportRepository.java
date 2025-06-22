@@ -11,4 +11,6 @@ public interface ReviewReportRepository extends JpaRepository<ReviewReport, Long
     List<ReviewReport> findAllByOrderByReportedAtDesc();
 
     boolean existsByReviewIdAndReporterEmail(Long reviewId, String reporterEmail);
+
+    List<ReviewReport> findAllByReviewId(Long reviewId);
 }
